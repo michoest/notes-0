@@ -1,0 +1,112 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  html {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  body {
+    @apply overscroll-none;
+    padding-top: env(safe-area-inset-top);
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
+  }
+
+  /* Custom scrollbar */
+  ::-webkit-scrollbar {
+    width: 4px;
+    height: 4px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-surface-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-surface-500;
+  }
+}
+
+@layer components {
+  .btn {
+    @apply inline-flex items-center justify-center gap-2 px-4 py-2 
+           font-medium rounded-xl transition-all duration-200
+           focus:outline-none focus:ring-2 focus:ring-offset-2 
+           focus:ring-offset-surface-900 disabled:opacity-50;
+  }
+
+  .btn-primary {
+    @apply btn bg-accent text-white hover:bg-accent-dark 
+           focus:ring-accent active:scale-95;
+  }
+
+  .btn-secondary {
+    @apply btn bg-surface-700 text-surface-100 hover:bg-surface-600 
+           focus:ring-surface-500 active:scale-95;
+  }
+
+  .btn-ghost {
+    @apply btn bg-transparent text-surface-300 hover:bg-surface-800 
+           hover:text-surface-100 focus:ring-surface-500;
+  }
+
+  .input {
+    @apply w-full px-4 py-3 bg-surface-800 border border-surface-700 
+           rounded-xl text-surface-100 placeholder-surface-500
+           focus:outline-none focus:ring-2 focus:ring-accent 
+           focus:border-transparent transition-all duration-200;
+  }
+
+  .card {
+    @apply bg-surface-800/50 backdrop-blur-sm border border-surface-700/50 
+           rounded-2xl overflow-hidden;
+  }
+
+  .list-item {
+    @apply flex items-start gap-3 p-4 bg-surface-800/30 
+           border-b border-surface-700/30 last:border-b-0
+           transition-all duration-200;
+  }
+
+  .list-item-completed {
+    @apply opacity-50;
+  }
+
+  .checkbox {
+    @apply w-5 h-5 rounded-full border-2 border-surface-500 
+           flex-shrink-0 mt-0.5 cursor-pointer
+           transition-all duration-200 hover:border-accent
+           flex items-center justify-center;
+  }
+
+  .checkbox-checked {
+    @apply bg-accent border-accent;
+  }
+
+  .nav-item {
+    @apply flex items-center gap-3 px-4 py-3 rounded-xl
+           text-surface-400 hover:text-surface-100 
+           hover:bg-surface-800/50 transition-all duration-200;
+  }
+
+  .nav-item-active {
+    @apply text-accent bg-accent/10;
+  }
+}
+
+@layer utilities {
+  .safe-bottom {
+    padding-bottom: max(1rem, env(safe-area-inset-bottom));
+  }
+
+  .safe-top {
+    padding-top: max(1rem, env(safe-area-inset-top));
+  }
+}
