@@ -1,8 +1,12 @@
 # Dependencies
 node_modules/
 
-# Build output
-dist/
+# Build output (keep if deploying via gh-pages branch)
+# dist/
+
+# API data
+api/data/*.json
+api/data/*.tmp
 
 # Local env files
 .env
@@ -22,7 +26,3 @@ Thumbs.db
 # Logs
 *.log
 npm-debug.log*
-
-# Generated icons (optional - can be committed)
-# public/pwa-*.png
-# public/apple-touch-icon.png

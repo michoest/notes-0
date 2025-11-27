@@ -14,11 +14,11 @@ export const useNotesStore = defineStore('notes', () => {
   const isLoading = ref(true)
 
   // Getters
-  const currentList = computed(() => 
+  const currentList = computed(() =>
     lists.value.find(l => l.id === currentListId.value)
   )
 
-  const currentItems = computed(() => 
+  const currentItems = computed(() =>
     items.value
       .filter(item => item.listId === currentListId.value)
       .sort((a, b) => {
@@ -53,10 +53,10 @@ export const useNotesStore = defineStore('notes', () => {
       if (savedLists.length === 0) {
         // Create default lists
         const defaultLists = [
-          { id: 'inbox', name: 'Inbox', icon: 'inbox', color: '#64748b', order: 0 },
-          { id: 'todo', name: 'To-Do', icon: 'check-circle', color: '#22c55e', order: 1 },
-          { id: 'shopping', name: 'Shopping', icon: 'shopping-cart', color: '#f97316', order: 2 },
-          { id: 'ideas', name: 'Ideas', icon: 'lightbulb', color: '#eab308', order: 3 },
+          { id: 'inbox', name: 'Inbox', icon: 'inbox', color: '#64748b', order: 0, description: 'Uncategorized items and quick captures' },
+          { id: 'todo', name: 'To-Do', icon: 'check-circle', color: '#22c55e', order: 1, description: 'Tasks and action items to complete' },
+          { id: 'shopping', name: 'Shopping', icon: 'shopping-cart', color: '#f97316', order: 2, description: 'Things to buy - groceries, household items, etc.' },
+          { id: 'ideas', name: 'Ideas', icon: 'lightbulb', color: '#eab308', order: 3, description: 'Creative ideas, thoughts, and inspiration' },
         ]
         await db.lists.bulkAdd(defaultLists)
         lists.value = defaultLists
@@ -86,7 +86,7 @@ export const useNotesStore = defineStore('notes', () => {
       createdAt: Date.now(),
       updatedAt: Date.now()
     }
-    
+
     await db.items.add(item)
     items.value.push(item)
     return item
@@ -131,7 +131,7 @@ export const useNotesStore = defineStore('notes', () => {
       color,
       order: lists.value.length
     }
-    
+
     await db.lists.add(list)
     lists.value.push(list)
     return list
@@ -163,18 +163,18 @@ export const useNotesStore = defineStore('notes', () => {
 
   async function saveSettings(newSettings) {
     settings.value = { ...settings.value, ...newSettings }
-    await db.settings.put({ id: 'main', value: settings.value })
+    await db.settings.put({ id: 'main', value: { ...settings.value } })
   }
 
   async function clearCompleted(listId) {
     const completedItems = items.value.filter(
       i => i.listId === listId && i.completed
     )
-    
+
     for (const item of completedItems) {
       await db.items.delete(item.id)
     }
-    
+
     items.value = items.value.filter(
       i => !(i.listId === listId && i.completed)
     )

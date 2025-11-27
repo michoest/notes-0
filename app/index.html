@@ -20,6 +20,15 @@
     <title>Voice Notes</title>
   </head>
   <body class="bg-surface-900 text-surface-100 antialiased">
+    <script>
+      (function() {
+        var redirect = sessionStorage.getItem('redirect');
+        if (redirect) {
+          sessionStorage.removeItem('redirect');
+          history.replaceState(null, '', redirect);
+        }
+      })();
+    </script>
     <div id="app"></div>
     <script type="module" src="/src/main.js"></script>
   </body>

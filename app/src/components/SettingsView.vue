@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted, computed, watch } from 'vue'
 import { useNotesStore } from '../stores/notes'
 
 const store = useNotesStore()
@@ -9,9 +9,15 @@ const showApiKey = ref(false)
 const saving = ref(false)
 const saved = ref(false)
 
-onMounted(() => {
-  apiKey.value = store.settings.openaiApiKey || ''
-})
+watch(
+  () => store.settings.openaiApiKey,
+  (newVal) => {
+    if (newVal && !apiKey.value) {
+      apiKey.value = newVal
+    }
+  },
+  { immediate: true }
+)
 
 async function saveSettings() {
   saving.value = true
