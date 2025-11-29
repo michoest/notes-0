@@ -12,24 +12,36 @@ const newItemText = ref('')
 const inputRef = ref(null)
 const showVoiceRecorder = ref(false)
 
-const list = computed(() => 
+const list = computed(() =>
   store.lists.find(l => l.id === route.params.listId)
 )
 
-const items = computed(() => 
+const showCompleted = computed(() =>
+  store.listSettings[route.params.listId] ?? false
+)
+
+const items = computed(() =>
   store.items
-    .filter(item => item.listId === route.params.listId)
+    .filter(item =>
+      item.listId === route.params.listId &&
+      !item.deletedAt &&
+      (showCompleted.value || !item.completed)
+    )
     .sort((a, b) => {
       if (a.completed !== b.completed) return a.completed ? 1 : -1
       return b.createdAt - a.createdAt
     })
 )
 
-const incompleteCount = computed(() => 
+function toggleShowCompleted() {
+  store.setShowCompleted(route.params.listId, !showCompleted.value)
+}
+
+const incompleteCount = computed(() =>
   items.value.filter(i => !i.completed).length
 )
 
-const completedCount = computed(() => 
+const completedCount = computed(() =>
   items.value.filter(i => i.completed).length
 )
 
@@ -42,7 +54,7 @@ watch(() => route.params.listId, (newId) => {
 async function addItem() {
   const text = newItemText.value.trim()
   if (!text) return
-  
+
   await store.addItem(route.params.listId, text)
   newItemText.value = ''
   await nextTick()
@@ -80,37 +92,25 @@ async function clearCompleted() {
     <!-- Add Item Form -->
     <div class="card mb-6">
       <div class="p-4 flex gap-3">
-        <input
-          ref="inputRef"
-          v-model="newItemText"
-          @keyup.enter="addItem"
-          type="text"
-          placeholder="Add a new item..."
-          class="input flex-1"
-        />
-        <button 
-          @click="addItem"
-          :disabled="!newItemText.trim()"
-          class="btn-primary px-4"
-        >
+        <input ref="inputRef" v-model="newItemText" @keyup.enter="addItem" type="text" placeholder="Add a new item..."
+          class="input flex-1" />
+        <button @click="addItem" :disabled="!newItemText.trim()" class="btn-primary px-4">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" />
           </svg>
           <span class="hidden sm:inline">Add</span>
         </button>
-        
+
         <!-- Desktop Voice Button -->
-        <button 
-          @click="showVoiceRecorder = !showVoiceRecorder"
-          :class="[
-            'btn hidden lg:flex',
-            showVoiceRecorder 
-              ? 'bg-red-500 text-white hover:bg-red-600' 
-              : 'btn-secondary'
-          ]"
-        >
+        <button @click="showVoiceRecorder = !showVoiceRecorder" :class="[
+          'btn hidden lg:flex',
+          showVoiceRecorder
+            ? 'bg-red-500 text-white hover:bg-red-600'
+            : 'btn-secondary'
+        ]">
           <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+              d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z" />
           </svg>
         </button>
       </div>
@@ -118,11 +118,7 @@ async function clearCompleted() {
       <!-- Voice Recorder (desktop inline) -->
       <Transition name="slide">
         <div v-if="showVoiceRecorder" class="border-t border-surface-700 p-6">
-          <VoiceButton 
-            @result="handleVoiceResult"
-            @cancel="showVoiceRecorder = false"
-            :compact="true"
-          />
+          <VoiceButton @result="handleVoiceResult" @cancel="showVoiceRecorder = false" :compact="true" />
         </div>
       </Transition>
     </div>
@@ -130,21 +126,19 @@ async function clearCompleted() {
     <!-- Items List -->
     <div v-if="items.length > 0" class="card">
       <TransitionGroup name="list" tag="div">
-        <NoteItem
-          v-for="item in items"
-          :key="item.id"
-          :item="item"
-        />
+        <NoteItem v-for="item in items" :key="item.id" :item="item" />
       </TransitionGroup>
 
       <!-- Clear Completed -->
-      <button
-        v-if="completedCount > 0"
-        @click="clearCompleted"
-        class="w-full p-3 text-sm text-surface-500 hover:text-red-400 
-               hover:bg-red-500/10 transition-colors border-t border-surface-700/30"
-      >
+      <button v-if="completedCount > 0 && showCompleted" @click="clearCompleted" class="w-full p-3 text-sm text-surface-500 hover:text-red-400 
+         hover:bg-red-500/10 transition-colors border-t border-surface-700/30">
         Clear {{ completedCount }} completed item{{ completedCount !== 1 ? 's' : '' }}
+      </button>
+
+      <!-- Show/Hide Completed Toggle -->
+      <button v-if="completedCount > 0" @click="toggleShowCompleted" class="w-full p-3 text-sm text-surface-400 hover:text-surface-200 
+         hover:bg-surface-700/30 transition-colors border-t border-surface-700/30">
+        {{ showCompleted ? 'Hide' : 'Show' }} {{ completedCount }} completed item{{ completedCount !== 1 ? 's' : '' }}
       </button>
     </div>
 
@@ -152,7 +146,8 @@ async function clearCompleted() {
     <div v-else class="text-center py-16">
       <div class="w-16 h-16 mx-auto mb-4 rounded-full bg-surface-800 flex items-center justify-center">
         <svg class="w-8 h-8 text-surface-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+            d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
         </svg>
       </div>
       <h3 class="font-display font-semibold text-surface-300 mb-1">No items yet</h3>

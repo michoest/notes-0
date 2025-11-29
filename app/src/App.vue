@@ -5,12 +5,15 @@ import { useNotesStore } from './stores/notes'
 import Sidebar from './components/Sidebar.vue'
 import VoiceButton from './components/VoiceButton.vue'
 import { useAI } from './composables/useAI'
+import { useSync } from './composables/useSync'
+import OnboardingView from './components/OnboardingView.vue'
 
 const router = useRouter()
 const route = useRoute()
 const store = useNotesStore()
 
 const { categorize } = useAI()
+const { workspace, init: initSync, sync, onSyncComplete } = useSync()
 
 const sidebarOpen = ref(false)
 const showVoiceModal = ref(false)
@@ -19,7 +22,12 @@ const countdown = ref(5)
 let countdownTimer = null
 
 onMounted(async () => {
+  onSyncComplete.value = () => store.initialize()
+  await initSync()
   await store.initialize()
+  if (workspace.value) {
+    sync()
+  }
 })
 
 function clearCountdown() {
@@ -32,6 +40,10 @@ function clearCountdown() {
 onUnmounted(() => {
   clearCountdown()
 })
+
+async function handleOnboardingComplete() {
+  await store.initialize()
+}
 
 // Close sidebar on route change (mobile)
 watch(() => route.path, () => {
@@ -78,9 +90,10 @@ function cancelItem() {
   pendingItem.value = null
 }
 </script>
-
 <template>
-  <div class="min-h-screen flex flex-col">
+  <OnboardingView v-if="!workspace" @complete="handleOnboardingComplete" />
+
+  <div v-else class="min-h-screen flex flex-col">
     <!-- Mobile Header -->
     <header
       class="lg:hidden flex items-center justify-between px-4 py-3 bg-surface-900/80 backdrop-blur-lg border-b border-surface-800 sticky top-0 z-40 safe-top">

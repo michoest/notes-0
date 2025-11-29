@@ -4,6 +4,9 @@ const { createServer } = require('http')
 const fs = require('fs')
 const path = require('path')
 const { v4: uuidv4 } = require('uuid')
+const webpush = require('web-push')
+require('dotenv').config()
+
 
 const app = express()
 app.use(express.json())
@@ -16,6 +19,12 @@ app.use((req, res, next) => {
   if (req.method === 'OPTIONS') return res.sendStatus(200)
   next()
 })
+
+webpush.setVapidDetails(
+  `mailto:${process.env.VAPID_EMAIL}`,
+  process.env.VAPID_PUBLIC_KEY,
+  process.env.VAPID_PRIVATE_KEY
+)
 
 // Data directory
 const DATA_DIR = path.join(__dirname, 'data')
@@ -81,7 +90,7 @@ app.get('/api/workspaces/:code', (req, res) => {
   res.json({ id: workspace.id, code: workspace.code })
 })
 
-app.post('/api/sync/:workspaceId', (req, res) => {
+app.post('/api/sync/:workspaceId', async (req, res) => {
   const { workspaceId } = req.params
   const { lastSyncAt, lists, items, deviceId } = req.body
 
@@ -118,6 +127,18 @@ app.post('/api/sync/:workspaceId', (req, res) => {
   const serverItems = workspace.items.filter(i => i.updatedAt > (lastSyncAt || 0))
 
   saveWorkspace(workspace)
+
+  // Send push notifications
+  const itemCount = (items || []).length
+  const listCount = (lists || []).length
+  if (itemCount > 0 || listCount > 0) {
+    const parts = []
+    if (itemCount > 0) parts.push(`${itemCount} item${itemCount > 1 ? 's' : ''}`)
+    if (listCount > 0) parts.push(`${listCount} list${listCount > 1 ? 's' : ''}`)
+    await notifyWorkspace(workspaceId, deviceId, `${parts.join(' and ')} updated`)
+  }
+  
+
   broadcastToWorkspace(workspaceId, { type: 'sync', changes }, deviceId)
 
   res.json({
@@ -126,6 +147,54 @@ app.post('/api/sync/:workspaceId', (req, res) => {
     syncedAt: Date.now()
   })
 })
+
+app.post('/api/workspaces/:workspaceId/subscribe', (req, res) => {
+  const { workspaceId } = req.params
+  const { subscription, deviceId } = req.body
+  
+  const workspace = loadWorkspace(workspaceId)
+  if (!workspace) {
+    return res.status(404).json({ error: 'Workspace not found' })
+  }
+  
+  if (!workspace.subscriptions) {
+    workspace.subscriptions = []
+  }
+  
+  // Remove existing subscription for this device
+  workspace.subscriptions = workspace.subscriptions.filter(s => s.deviceId !== deviceId)
+  
+  // Add new subscription
+  workspace.subscriptions.push({ deviceId, subscription })
+  
+  saveWorkspace(workspace)
+  res.json({ success: true })
+})
+
+async function notifyWorkspace(workspaceId, excludeDeviceId, message) {
+  const workspace = loadWorkspace(workspaceId)
+  if (!workspace?.subscriptions) return
+  
+  const payload = JSON.stringify({
+    title: 'Voice Notes',
+    body: message,
+    icon: '/pwa-192x192.png'
+  })
+  
+  for (const { deviceId, subscription } of workspace.subscriptions) {
+    if (deviceId === excludeDeviceId) continue
+    
+    try {
+      await webpush.sendNotification(subscription, payload)
+    } catch (err) {
+      if (err.statusCode === 410) {
+        // Subscription expired, remove it
+        workspace.subscriptions = workspace.subscriptions.filter(s => s.deviceId !== deviceId)
+        saveWorkspace(workspace)
+      }
+    }
+  }
+}
 
 // --- WebSocket ---
 
@@ -165,7 +234,7 @@ function broadcastToWorkspace(workspaceId, message, excludeDeviceId) {
 
 // --- Start ---
 
-const PORT = process.env.PORT || 3000
+const PORT = process.env.PORT || 3001
 server.listen(PORT, '0.0.0.0', () => {
   console.log(`Server running on port ${PORT}`)
 })

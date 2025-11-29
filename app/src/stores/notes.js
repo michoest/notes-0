@@ -1,9 +1,11 @@
 import { defineStore } from 'pinia'
 import { ref, computed } from 'vue'
 import { db } from './db'
+import { useSync } from '../composables/useSync'
 
 export const useNotesStore = defineStore('notes', () => {
   // State
+  const listSettings = ref({})
   const lists = ref([])
   const items = ref([])
   const settings = ref({
@@ -20,9 +22,8 @@ export const useNotesStore = defineStore('notes', () => {
 
   const currentItems = computed(() =>
     items.value
-      .filter(item => item.listId === currentListId.value)
+      .filter(item => item.listId === currentListId.value && !item.deletedAt)
       .sort((a, b) => {
-        // Incomplete items first, then by creation date (newest first)
         if (a.completed !== b.completed) return a.completed ? 1 : -1
         return b.createdAt - a.createdAt
       })
@@ -53,10 +54,10 @@ export const useNotesStore = defineStore('notes', () => {
       if (savedLists.length === 0) {
         // Create default lists
         const defaultLists = [
-          { id: 'inbox', name: 'Inbox', icon: 'inbox', color: '#64748b', order: 0, description: 'Uncategorized items and quick captures' },
-          { id: 'todo', name: 'To-Do', icon: 'check-circle', color: '#22c55e', order: 1, description: 'Tasks and action items to complete' },
-          { id: 'shopping', name: 'Shopping', icon: 'shopping-cart', color: '#f97316', order: 2, description: 'Things to buy - groceries, household items, etc.' },
-          { id: 'ideas', name: 'Ideas', icon: 'lightbulb', color: '#eab308', order: 3, description: 'Creative ideas, thoughts, and inspiration' },
+          { id: 'inbox', name: 'Inbox', icon: 'inbox', color: '#64748b', order: 0, updatedAt: Date.now() },
+          { id: 'todo', name: 'To-Do', icon: 'check-circle', color: '#22c55e', order: 1, updatedAt: Date.now() },
+          { id: 'shopping', name: 'Shopping', icon: 'shopping-cart', color: '#f97316', order: 2, updatedAt: Date.now() },
+          { id: 'ideas', name: 'Ideas', icon: 'lightbulb', color: '#eab308', order: 3, updatedAt: Date.now() },
         ]
         await db.lists.bulkAdd(defaultLists)
         lists.value = defaultLists
@@ -66,6 +67,7 @@ export const useNotesStore = defineStore('notes', () => {
 
       // Load items
       items.value = await db.items.toArray()
+      await loadListSettings()
     } catch (error) {
       console.error('Failed to initialize store:', error)
     } finally {
@@ -84,11 +86,16 @@ export const useNotesStore = defineStore('notes', () => {
       text,
       completed: false,
       createdAt: Date.now(),
-      updatedAt: Date.now()
+      updatedAt: Date.now(),
+      deletedAt: null
     }
 
     await db.items.add(item)
     items.value.push(item)
+
+    const { sync } = useSync()
+    sync()
+
     return item
   }
 
@@ -102,9 +109,12 @@ export const useNotesStore = defineStore('notes', () => {
       updatedAt: Date.now()
     }
 
-    await db.items.put(updatedItem)
+    await db.items.put({ ...updatedItem })
     const index = items.value.findIndex(i => i.id === itemId)
     items.value[index] = updatedItem
+
+    const { sync } = useSync()
+    sync()
   }
 
   async function toggleItem(itemId) {
@@ -115,8 +125,20 @@ export const useNotesStore = defineStore('notes', () => {
   }
 
   async function deleteItem(itemId) {
-    await db.items.delete(itemId)
+    const item = items.value.find(i => i.id === itemId)
+    if (!item) return
+
+    const deletedItem = {
+      ...item,
+      deletedAt: Date.now(),
+      updatedAt: Date.now()
+    }
+
+    await db.items.put({ ...deletedItem })
     items.value = items.value.filter(i => i.id !== itemId)
+
+    const { sync } = useSync()
+    sync()
   }
 
   async function moveItem(itemId, newListId) {
@@ -129,11 +151,16 @@ export const useNotesStore = defineStore('notes', () => {
       name,
       icon,
       color,
-      order: lists.value.length
+      order: lists.value.length,
+      updatedAt: Date.now()
     }
 
     await db.lists.add(list)
     lists.value.push(list)
+
+    const { sync } = useSync()
+    sync()
+
     return list
   }
 
@@ -180,6 +207,26 @@ export const useNotesStore = defineStore('notes', () => {
     )
   }
 
+  async function getShowCompleted(listId) {
+    const setting = await db.settings.get(`showCompleted_${listId}`)
+    return setting?.value ?? false
+  }
+
+  async function setShowCompleted(listId, show) {
+    listSettings.value[listId] = show
+    await db.settings.put({ id: `showCompleted_${listId}`, value: show })
+  }
+
+  async function loadListSettings() {
+    const allSettings = await db.settings.toArray()
+    for (const s of allSettings) {
+      if (s.id.startsWith('showCompleted_')) {
+        const listId = s.id.replace('showCompleted_', '')
+        listSettings.value[listId] = s.value
+      }
+    }
+  }
+
   return {
     // State
     lists,
@@ -204,6 +251,8 @@ export const useNotesStore = defineStore('notes', () => {
     updateList,
     deleteList,
     saveSettings,
-    clearCompleted
+    clearCompleted,
+    listSettings,
+    setShowCompleted,
   }
 })
