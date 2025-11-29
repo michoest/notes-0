@@ -23,6 +23,11 @@ const router = createRouter({
       component: () => import('./components/QuickAdd.vue')
     },
     {
+      path: '/add',
+      name: 'add',
+      component: () => import('./components/AddFromUrl.vue')
+    },
+    {
       path: '/settings',
       name: 'settings',
       component: () => import('./components/SettingsView.vue')

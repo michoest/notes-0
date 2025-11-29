@@ -29,7 +29,6 @@ async function startScanner() {
       async (code) => {
         await stopScanner()
         joinCode.value = code
-        alert('Scanned: "' + code + '"')
         handleJoin()
       },
       () => { } // Ignore errors during scanning

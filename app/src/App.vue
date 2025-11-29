@@ -7,10 +7,18 @@ import VoiceButton from './components/VoiceButton.vue'
 import { useAI } from './composables/useAI'
 import { useSync } from './composables/useSync'
 import OnboardingView from './components/OnboardingView.vue'
+import Toast from './components/Toast.vue'
 
 const router = useRouter()
 const route = useRoute()
 const store = useNotesStore()
+const toast = ref({ visible: false, message: '' })
+
+function showToast(message) {
+  toast.value = { visible: true, message }
+}
+
+window.showToast = showToast
 
 const { categorize } = useAI()
 const { workspace, init: initSync, sync, onSyncComplete } = useSync()
@@ -28,6 +36,27 @@ onMounted(async () => {
   if (workspace.value) {
     sync()
   }
+
+  window.addEventListener('add-from-url', async (e) => {
+    const { text } = e.detail
+    if (text && workspace.value) {
+      const result = await categorize(text)
+
+      pendingItem.value = {
+        text: result.text,
+        listId: result.listId
+      }
+
+      countdown.value = 5
+      clearCountdown()
+      countdownTimer = setInterval(() => {
+        countdown.value--
+        if (countdown.value <= 0) {
+          confirmItem()
+        }
+      }, 1000)
+    }
+  })
 })
 
 function clearCountdown() {
@@ -190,6 +219,8 @@ function cancelItem() {
       </div>
     </Transition>
   </div>
+
+  <Toast :message="toast.message" :visible="toast.visible" @hide="toast.visible = false" />
 </template>
 
 <style>
